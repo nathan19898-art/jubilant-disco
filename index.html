@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Off-Peak Rate Delay Dashboard</title>
+<style>
+:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+body { margin:0; padding:20px; background:#0b0d12; color:#e9eefc; }
+.wrap { max-width:980px; margin:0 auto; display:grid; gap:14px; }
+.card { background:#121826; border:1px solid #222b40; border-radius:14px; padding:14px; }
+.topbar { display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; align-items:flex-start; }
+h1 { margin:0; font-size:20px; }
+.muted { color:#a9b3cc; font-size:13px; line-height:1.35; }
+.mono { font-variant-numeric:tabular-nums; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.pill { padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid #2a3552; background:#0f1422; height:fit-content; }
+
+.grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+@media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+
+.machineHeader { display:flex; justify-content:space-between; align-items:baseline; }
+.title { font-size:18px; font-weight:800; }
+.mode { font-size:12px; padding:4px 10px; border-radius:999px; border:1px solid #2a3552; background:#0f1422; }
+
+.line { display:flex; justify-content:space-between; padding:10px; margin-top:8px;
+        border-radius:12px; background:#0f1422; border:1px solid #222b40; align-items:center; }
+
+.traffic { width:14px; height:14px; border-radius:50%; display:inline-block;
+           margin-right:8px; border:1px solid #2a3552; vertical-align:-2px; }
+
+.green { background:#1f5a39; border-color:#1f5a39; }
+.amber { background:#8a6b12; border-color:#8a6b12; }
+.red   { background:#7a1f2a; border-color:#7a1f2a; }
+
+.controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+label { font-size:13px; color:#a9b3cc; display:flex; gap:8px; align-items:center; }
+input[type="time"]{
+  background:#0f1422; color:#e9eefc; border:1px solid #222b40;
+  border-radius:10px; padding:6px 10px;
+}
+input[type="checkbox"]{ width:16px; height:16px; }
+small { color:#a9b3cc; }
+hr { border:none; border-top:1px solid #222b40; margin:10px 0 0; }
+
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <div class="topbar">
+      <div>
+        <h1>Off-Peak Rate Delay Dashboard</h1>
+        <div class="muted">
+          Off-peak window: <span class="mono">23:30 → 05:30</span><br/>
+          Delay start window: <span class="mono" id="startWinText"></span><br/>
+          Delay finish window: <span class="mono" id="finishWinText"></span><br/>
+          Assumed max cycle: <span class="mono" id="cycleText"></span>
+        </div>
+        <hr/>
+        <div class="mono" style="font-size:18px;font-weight:800;margin-top:10px;" id="nowText"></div>
+      </div>
+      <div class="pill" id="inWindowPill">...</div>
+    </div>
+
+    <div class="controls">
+      <label><input id="useTest" type="checkbox"> Use test time</label>
+
+      <div id="testControls" class="hidden" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <label>Test HH:MM <input id="testTime" type="time" step="60" value="00:30"></label>
+        <small class="mono" id="testHint"></small>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="machineHeader">
+        <div class="title">Dishwasher</div>
+        <div class="mode">Delay start</div>
+      </div>
+      <div id="dwMain"></div>
+    </div>
+
+    <div class="card">
+      <div class="machineHeader">
+        <div class="title">Tumble Dryer</div>
+        <div class="mode">Delay start</div>
+      </div>
+      <div id="tdMain"></div>
+    </div>
+
+    <div class="card">
+      <div class="machineHeader">
+        <div class="title">Washing Machine</div>
+        <div class="mode">Delay finish</div>
+      </div>
+      <div id="wmMain"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/** Cheap window in LOCAL time */
+const CHEAP_START = { h: 23, m: 30 };
+const CHEAP_END   = { h: 5,  m: 30 };
+
+/** Global assumptions */
+const MAX_CYCLE_MIN = 210;      // 3.5h
+const YELLOW_PAD_MIN = 30;      // "close enough" outside window
+
+/** Preset delays (hours) */
+const DISHWASHER_H = [3, 6, 9];
+const WASHER_H = Array.from({ length: 22 }, (_, i) => i + 3); // 3..24 by 1 hour
+const DRYER_H = [
+  ...Array.from({ length: 20 }, (_, i) => (i + 1) * 0.5),     // 0.5..10 by 0.5
+  11, 12, 13, 14, 16, 18, 20, 22, 24
+];
+
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, "0");
+
+const fmtNow  = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+const fmtTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+const addMin  = (d, m) => new Date(d.getTime() + m * 60000);
+
+function minsToHm(mins){
+  const h = Math.floor(mins/60);
+  const m = mins%60;
+  return `${h}h ${pad(m)}m`;
+}
+
+/** test-time override */
+function getNow(){
+  if (!$("useTest").checked) return new Date();
+  const [hh, mm] = ($("testTime").value || "00:30").split(":").map(x=>parseInt(x,10));
+  const d = new Date();
+  d.setHours(hh, mm, 0, 0);
+  return d;
+}
+
+/**
+ * Cheap-window detection (correct after midnight).
+ */
+function getCheapWindow(now){
+  // Today's 23:30
+  const startToday = new Date(now);
+  startToday.setHours(CHEAP_START.h, CHEAP_START.m, 0, 0);
+
+  // Tomorrow 05:30
+  const endFromStartToday = new Date(startToday);
+  endFromStartToday.setDate(endFromStartToday.getDate() + 1);
+  endFromStartToday.setHours(CHEAP_END.h, CHEAP_END.m, 0, 0);
+
+  // Yesterday 23:30
+  const startYesterday = new Date(startToday);
+  startYesterday.setDate(startYesterday.getDate() - 1);
+
+  // Today 05:30
+  const endMorningToday = new Date(startToday);
+  endMorningToday.setHours(CHEAP_END.h, CHEAP_END.m, 0, 0);
+
+  // In low-rate after midnight (00:00 → 05:30)
+  if (now >= startYesterday && now < endMorningToday) {
+    return { start: startYesterday, end: endMorningToday, in: true };
+  }
+
+  // In low-rate before midnight (23:30 → 23:59)
+  if (now >= startToday && now < endFromStartToday) {
+    return { start: startToday, end: endFromStartToday, in: true };
+  }
+
+  // Not in low-rate: return the NEXT upcoming window
+  if (now < startToday) {
+    return { start: startToday, end: endFromStartToday, in: false };
+  }
+
+  // Next window is tomorrow 23:30 → following day 05:30
+  const startTomorrow = new Date(startToday);
+  startTomorrow.setDate(startTomorrow.getDate() + 1);
+
+  const endFromStartTomorrow = new Date(startTomorrow);
+  endFromStartTomorrow.setDate(endFromStartTomorrow.getDate() + 1);
+  endFromStartTomorrow.setHours(CHEAP_END.h, CHEAP_END.m, 0, 0);
+
+  return { start: startTomorrow, end: endFromStartTomorrow, in: false };
+}
+
+/** Fixed “simple” windows derived from MAX_CYCLE_MIN */
+function getStartWindow(cheap){
+  const start = cheap.start;                // 23:30
+  const end = addMin(cheap.end, -MAX_CYCLE_MIN); // 02:00
+  return { start, end };
+}
+function getFinishWindow(cheap){
+  const start = addMin(cheap.start, MAX_CYCLE_MIN); // 03:00
+  const end = cheap.end;                            // 05:30
+  return { start, end };
+}
+
+function isBetween(t, a, b){ return t >= a && t <= b; }
+
+/** Classify a time against a window with yellow padding */
+function classifyAgainstWindow(t, win){
+  if (isBetween(t, win.start, win.end)) return "green";
+  const yellowStart = addMin(win.start, -YELLOW_PAD_MIN);
+  const yellowEnd   = addMin(win.end,   +YELLOW_PAD_MIN);
+  return isBetween(t, yellowStart, yellowEnd) ? "amber" : "red";
+}
+
+/** Distance-to-window score for sorting (0 if inside green; else mins outside) */
+function distanceToWindowMin(t, win){
+  if (t < win.start) return Math.round((win.start - t)/60000);
+  if (t > win.end)   return Math.round((t - win.end)/60000);
+  return 0;
+}
+function lightRank(light){
+  if (light === "green") return 0;
+  if (light === "amber") return 1;
+  return 2;
+}
+
+/**
+ * Pick best N with this ordering:
+ * 1) Better light (green, amber, red)
+ * 2) Closer to window (distance)
+ * 3) Prefer LONGER delays first (reverse mins)
+ */
+function bestN(options, N){
+  options.sort((a,b)=>{
+    const lr = lightRank(a.light) - lightRank(b.light);
+    if (lr) return lr;
+    const d  = a.dist - b.dist;
+    if (d) return d;
+    return b.mins - a.mins; // longest first
+  });
+  return options.slice(0, N);
+}
+
+function delayText(mins){
+  const h = Math.floor(mins/60);
+  const m = mins%60;
+  return `${h}h ${pad(m)}m`;
+}
+
+/**
+ * Render modes:
+ * - normal: just options
+ * - START NOW only
+ * - START NOW + options (washer quirk)
+ */
+function render(elId, rows, nowMode, nowLabel, alsoShowRows=false){
+  let html = "";
+  if (nowMode) {
+    html += `
+      <div class="line">
+        <span>
+          <span class="traffic green"></span>
+          <span class="muted">START NOW</span>
+        </span>
+        <b class="mono">${nowLabel}</b>
+      </div>
+    `;
+    if (!alsoShowRows) {
+      $(elId).innerHTML = html;
+      return;
+    }
+  }
+
+  html += rows.map(r => `
+    <div class="line">
+      <span><span class="traffic ${r.light}"></span>${r.delay}</span>
+      <b class="mono">${r.time}</b>
+    </div>
+  `).join("");
+
+  $(elId).innerHTML = html;
+}
+
+function buildOptions(now, delaysMin, windowObj){
+  return delaysMin.map(mins=>{
+    const t = addMin(now, mins);
+    const light = classifyAgainstWindow(t, windowObj);
+    const dist = distanceToWindowMin(t, windowObj);
+    return { mins, light, dist, time: t };
+  });
+}
+
+function tick(){
+  const realNow = new Date();
+  const now = getNow();
+  const usingTest = $("useTest").checked;
+
+  $("nowText").textContent = usingTest ? `Now (test): ${fmtTime(now)}` : `Now: ${fmtNow(now)}`;
+  $("testHint").textContent = usingTest ? `Testing scenarios (real clock is ${fmtNow(realNow)})` : "";
+
+  const cheap = getCheapWindow(now);
+
+  $("inWindowPill").textContent = cheap.in ? "In low-rate" : "Not in low-rate";
+  $("inWindowPill").style.borderColor = cheap.in ? "#1f5a39" : "#2a3552";
+
+  const startWin  = getStartWindow(cheap);   // 23:30 -> 02:00
+  const finishWin = getFinishWindow(cheap);  // 03:00 -> 05:30
+
+  // Use same arrow for all displayed ranges
+  $("startWinText").textContent = `${fmtTime(startWin.start)} → ${fmtTime(startWin.end)}`;
+  $("finishWinText").textContent = `${fmtTime(finishWin.start)} → ${fmtTime(finishWin.end)}`;
+  $("cycleText").textContent = `${minsToHm(MAX_CYCLE_MIN)} (≤ ${MAX_CYCLE_MIN} min)`;
+
+  // START NOW logic:
+  // - Start devices: START NOW if NOW inside start window (23:30–02:00)
+  const startNowModeStartDevices = isBetween(now, startWin.start, startWin.end);
+
+  // - Washer quirk: START NOW if we're in low-rate AND before finish window start (23:30–03:00)
+  const washerStartNowMode = cheap.in && now < finishWin.start;
+
+  // Dishwasher
+  if (startNowModeStartDevices) {
+    render("dwMain", [], true, fmtTime(now));
+  } else {
+    const dwDelaysMin = DISHWASHER_H.map(h => Math.round(h*60));
+    const dwOpts = buildOptions(now, dwDelaysMin, startWin);
+    const dwBest = bestN(dwOpts, 3).map(o=>({
+      light: o.light,
+      delay: delayText(o.mins),
+      time: fmtTime(o.time)
+    }));
+    render("dwMain", dwBest, false, "");
+  }
+
+  // Dryer
+  if (startNowModeStartDevices) {
+    render("tdMain", [], true, fmtTime(now));
+  } else {
+    const tdDelaysMin = DRYER_H.map(h => Math.round(h*60));
+    const tdOpts = buildOptions(now, tdDelaysMin, startWin);
+    const tdBest = bestN(tdOpts, 3).map(o=>({
+      light: o.light,
+      delay: delayText(o.mins),
+      time: fmtTime(o.time)
+    }));
+    render("tdMain", tdBest, false, "");
+  }
+
+  // Washer: show START NOW + still show best delays (so you can still choose 3h etc.)
+  const wmDelaysMin = WASHER_H.map(h => Math.round(h*60));
+  const wmOpts = buildOptions(now, wmDelaysMin, finishWin);
+  const wmBest = bestN(wmOpts, 3).map(o=>({
+    light: o.light,
+    delay: delayText(o.mins),
+    time: fmtTime(o.time)
+  }));
+
+  if (washerStartNowMode) {
+    render("wmMain", wmBest, true, fmtTime(now), true);
+  } else {
+    render("wmMain", wmBest, false, "");
+  }
+}
+
+/** Hide/show test time input until enabled */
+function syncTestUI(){
+  const on = $("useTest").checked;
+  $("testControls").classList.toggle("hidden", !on);
+  if (!on) $("testHint").textContent = "";
+}
+
+$("useTest").addEventListener("change", () => { syncTestUI(); tick(); });
+$("testTime").addEventListener("input", tick);
+
+syncTestUI();
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
