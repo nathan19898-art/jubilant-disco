@@ -103,165 +103,40 @@ hr { border:none; border-top:1px solid #222b40; margin:10px 0 0; }
 </div>
 
 <script>
-/** Cheap window in LOCAL time */
-const CHEAP_START = { h: 23, m: 30 };
-const CHEAP_END   = { h: 5,  m: 30 };
+const CHEAP_START={h:23,m:30},CHEAP_END={h:5,m:30};
+const MAX_CYCLE_MIN=210,YELLOW_PAD_MIN=30;
+const DISHWASHER_H=[3,6,9],WASHER_H=Array.from({length:22},(_,i)=>i+3),DRYER_H=[...Array.from({length:20},(_,i)=>(i+1)*0.5),11,12,13,14,16,18,20,22,24];
+const $=(id)=>document.getElementById(id),pad=(n)=>String(n).padStart(2,"0");
+const fmtNow=(d)=>`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,fmtTime=(d)=>`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const addMin=(d,m)=>new Date(d.getTime()+m*60000);
+function minsToHm(mins){const h=Math.floor(mins/60),m=mins%60;return `${h}h ${pad(m)}m`;}
+function getNow(){if(!$("useTest").checked)return new Date();const [hh,mm]=($("testTime").value||"00:30").split(":").map(x=>parseInt(x,10));const d=new Date();d.setHours(hh,mm,0,0);return d;}
+function getCheapWindow(now){const startToday=new Date(now);startToday.setHours(CHEAP_START.h,CHEAP_START.m,0,0);const endFromStartToday=new Date(startToday);endFromStartToday.setDate(endFromStartToday.getDate()+1);endFromStartToday.setHours(CHEAP_END.h,CHEAP_END.m,0,0);const startYesterday=new Date(startToday);startYesterday.setDate(startYesterday.getDate()-1);const endMorningToday=new Date(startToday);endMorningToday.setHours(CHEAP_END.h,CHEAP_END.m,0,0);if(now>=startYesterday&&now<endMorningToday)return{start:startYesterday,end:endMorningToday,in:true};if(now>=startToday&&now<endFromStartToday)return{start:startToday,end:endFromStartToday,in:true};if(now<startToday)return{start:startToday,end:endFromStartToday,in:false};const startTomorrow=new Date(startToday);startTomorrow.setDate(startTomorrow.getDate()+1);const endFromStartTomorrow=new Date(startTomorrow);endFromStartTomorrow.setDate(endFromStartTomorrow.getDate()+1);endFromStartTomorrow.setHours(CHEAP_END.h,CHEAP_END.m,0,0);return{start:startTomorrow,end:endFromStartTomorrow,in:false};}
+function getStartWindow(cheap){return{start:cheap.start,end:addMin(cheap.end,-MAX_CYCLE_MIN)};}
+function getFinishWindow(cheap){return{start:addMin(cheap.start,MAX_CYCLE_MIN),end:cheap.end};}
+function isBetween(t,a,b){return t>=a&&t<=b;}
+function classifyAgainstWindow(t,win){if(isBetween(t,win.start,win.end))return"green";const yellowStart=addMin(win.start,-YELLOW_PAD_MIN),yellowEnd=addMin(win.end,+YELLOW_PAD_MIN);return isBetween(t,yellowStart,yellowEnd)?"amber":"red";}
+function distanceToWindowMin(t,win){if(t<win.start)return Math.round((win.start-t)/60000);if(t>win.end)return Math.round((t-win.end)/60000);return 0;}
+function lightRank(light){return light==="green"?0:light==="amber"?1:2;}
+function bestN(options,N,preferLongest=false){options.sort((a,b)=>{const lr=lightRank(a.light)-lightRank(b.light);if(lr)return lr;const d=a.dist-b.dist;if(d)return d;return preferLongest?(b.mins-a.mins):(a.mins-b.mins);});return options.slice(0,N);}
+function delayText(mins){const h=Math.floor(mins/60),m=mins%60;return`${h}h ${pad(m)}m`;}
+function buildOptions(now,delaysMin,windowObj){return delaysMin.map(mins=>{const t=addMin(now,mins);const light=classifyAgainstWindow(t,windowObj);const dist=distanceToWindowMin(t,windowObj);return{mins,light,dist,time:t};});}
+function render(elId,rows,nowMode,nowLabel){let html="";if(nowMode){html=`<div class="line"><span><span class="traffic green"></span><span class="muted">START NOW</span></span><b class="mono">${nowLabel}</b></div>`;$(elId).innerHTML=html;return;}html+=rows.map(r=>`<div class="line"><span><span class="traffic ${r.light}"></span>${r.delay}</span><b class="mono">${fmtTime(r.time)}</b></div>`).join("");$(elId).innerHTML=html;}
+function tick(){const realNow=new Date(),now=getNow(),cheap=getCheapWindow(now);$("nowText").textContent=$("useTest").checked?`Now (test): ${fmtTime(now)}`:`Now: ${fmtNow(now)}`;$("testHint").textContent=$("useTest").checked?`Testing scenarios (real clock ${fmtNow(realNow)})`:"";$("inWindowPill").textContent=cheap.in?"In low-rate":"Not in low-rate";$("inWindowPill").style.borderColor=cheap.in?"#1f5a39":"#2a3552";const startWin=getStartWindow(cheap),finishWin=getFinishWindow(cheap);$("startWinText").textContent=`${fmtTime(startWin.start)} → ${fmtTime(startWin.end)}`;$("finishWinText").textContent=`${fmtTime(finishWin.start)} → ${fmtTime(finishWin.end)}`;$("cycleText").textContent=`${minsToHm(MAX_CYCLE_MIN)} (≤ ${MAX_CYCLE_MIN} min)`;const startNowModeStartDevices=isBetween(now,startWin.start,startWin.end),washerStartNowMode=cheap.in&&now<finishWin.start;
+// Dishwasher
+const dwOpts=buildOptions(now,DISHWASHER_H.map(h=>h*60),startWin);const dwBest=bestN(dwOpts,3,false).sort((a,b)=>a.mins-b.mins).map(o=>({light:o.light,delay:delayText(o.mins),time:o.time}));render("dwMain",startNowModeStartDevices?[]:dwBest,startNowModeStartDevices,fmtTime(now));
+// Tumble Dryer
+const tdOpts=buildOptions(now,DRYER_H.map(h=>Math.round(h*60)),startWin);const tdBest=bestN(tdOpts,3,false).sort((a,b)=>a.mins-b.mins).map(o=>({light:o.light,delay:delayText(o.mins),time:o.time}));render("tdMain",startNowModeStartDevices?[]:tdBest,startNowModeStartDevices,fmtTime(now));
+// Washing Machine
+const wmOpts=buildOptions(now,WASHER_H.map(h=>Math.round(h*60)),finishWin);const wmBest=bestN(wmOpts,3,true).sort((a,b)=>b.mins-a.mins).map(o=>({light:o.light,delay:delayText(o.mins),time:o.time}));render("wmMain",washerStartNowMode?[]:wmBest,washerStartNowMode,fmtTime(now));}
 
-/** Global assumptions */
-const MAX_CYCLE_MIN = 210;      // 3.5h
-const YELLOW_PAD_MIN = 30;      // "close enough" outside window
-
-/** Preset delays (hours) */
-const DISHWASHER_H = [3, 6, 9];
-const WASHER_H = Array.from({ length: 22 }, (_, i) => i + 3); // 3..24
-const DRYER_H = [
-  ...Array.from({ length: 20 }, (_, i) => (i + 1) * 0.5),
-  11,12,13,14,16,18,20,22,24
-];
-
-const $ = (id) => document.getElementById(id);
-const pad = (n) => String(n).padStart(2, "0");
-
-const fmtNow  = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-const fmtTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-const addMin  = (d, m) => new Date(d.getTime() + m * 60000);
-
-function minsToHm(mins){
-  const h = Math.floor(mins/60);
-  const m = mins%60;
-  return `${h}h ${pad(m)}m`;
-}
-
-/** test-time override */
-function getNow(){
-  if (!$("useTest").checked) return new Date();
-  const [hh, mm] = ($("testTime").value || "00:30").split(":").map(x=>parseInt(x,10));
-  const d = new Date();
-  d.setHours(hh, mm, 0, 0);
-  return d;
-}
-
-/** Cheap-window detection */
-function getCheapWindow(now){
-  const startToday = new Date(now);
-  startToday.setHours(CHEAP_START.h, CHEAP_START.m, 0, 0);
-  const endFromStartToday = new Date(startToday);
-  endFromStartToday.setDate(endFromStartToday.getDate() + 1);
-  endFromStartToday.setHours(CHEAP_END.h, CHEAP_END.m, 0, 0);
-
-  const startYesterday = new Date(startToday);
-  startYesterday.setDate(startYesterday.getDate() - 1);
-  const endMorningToday = new Date(startToday);
-  endMorningToday.setHours(CHEAP_END.h, CHEAP_END.m, 0, 0);
-
-  if (now >= startYesterday && now < endMorningToday) return { start: startYesterday, end: endMorningToday, in: true };
-  if (now >= startToday && now < endFromStartToday) return { start: startToday, end: endFromStartToday, in: true };
-  if (now < startToday) return { start: startToday, end: endFromStartToday, in: false };
-
-  const startTomorrow = new Date(startToday);
-  startTomorrow.setDate(startTomorrow.getDate() + 1);
-  const endFromStartTomorrow = new Date(startTomorrow);
-  endFromStartTomorrow.setDate(endFromStartTomorrow.getDate() + 1);
-  endFromStartTomorrow.setHours(CHEAP_END.h, CHEAP_END.m, 0, 0);
-  return { start: startTomorrow, end: endFromStartTomorrow, in: false };
-}
-
-/** Derived start/finish windows */
-function getStartWindow(cheap){ return { start: cheap.start, end: addMin(cheap.end,-MAX_CYCLE_MIN) }; }
-function getFinishWindow(cheap){ return { start: addMin(cheap.start, MAX_CYCLE_MIN), end: cheap.end }; }
-
-function isBetween(t, a, b){ return t >= a && t <= b; }
-function classifyAgainstWindow(t, win){
-  if (isBetween(t, win.start, win.end)) return "green";
-  const yellowStart = addMin(win.start, -YELLOW_PAD_MIN);
-  const yellowEnd   = addMin(win.end, +YELLOW_PAD_MIN);
-  return isBetween(t, yellowStart, yellowEnd) ? "amber" : "red";
-}
-function distanceToWindowMin(t, win){ if(t<win.start) return Math.round((win.start-t)/60000); if(t>win.end) return Math.round((t-win.end)/60000); return 0; }
-function lightRank(light){ return light==="green"?0:light==="amber"?1:2; }
-
-/** Pick best N according to machine preference */
-function bestN(options, N, preferLongest=false){
-  options.sort((a,b)=>{
-    const lr = lightRank(a.light)-lightRank(b.light); if(lr) return lr;
-    const d = distanceToWindowMin(a.time, a.window)-distanceToWindowMin(b.time, b.window); if(d) return d;
-    return preferLongest ? (b.mins-a.mins) : (a.mins-b.mins);
-  });
-  return options.slice(0,N);
-}
-
-function delayText(mins){ const h=Math.floor(mins/60); const m=mins%60; return `${h}h ${pad(m)}m`; }
-
-function buildOptions(now, delaysMin, windowObj){
-  return delaysMin.map(mins=>{
-    const t = addMin(now, mins);
-    const light = classifyAgainstWindow(t, windowObj);
-    const dist = distanceToWindowMin(t, windowObj);
-    return { mins, light, dist, time: t };
-  });
-}
-
-/** Render list */
-function render(elId, rows, nowMode, nowLabel){
-  let html = "";
-  if(nowMode){
-    html += `<div class="line"><span><span class="traffic green"></span><span class="muted">START NOW</span></span><b class="mono">${nowLabel}</b></div>`;
-    $(elId).innerHTML = html; return;
-  }
-  html += rows.map(r=>`<div class="line"><span><span class="traffic ${r.light}"></span>${r.delay}</span><b class="mono">${fmtTime(r.time)}</b></div>`).join("");
-  $(elId).innerHTML = html;
-}
-
-/** Tick/update dashboard */
-function tick(){
-  const realNow = new Date();
-  const now = getNow();
-  const cheap = getCheapWindow(now);
-
-  $("nowText").textContent = $("useTest").checked ? `Now (test): ${fmtTime(now)}` : `Now: ${fmtNow(now)}`;
-  $("testHint").textContent = $("useTest").checked ? `Testing scenarios (real clock ${fmtNow(realNow)})` : "";
-
-  $("inWindowPill").textContent = cheap.in ? "In low-rate" : "Not in low-rate";
-  $("inWindowPill").style.borderColor = cheap.in ? "#1f5a39" : "#2a3552";
-
-  const startWin = getStartWindow(cheap);
-  const finishWin = getFinishWindow(cheap);
-
-  $("startWinText").textContent = `${fmtTime(startWin.start)} → ${fmtTime(startWin.end)}`;
-  $("finishWinText").textContent = `${fmtTime(finishWin.start)} → ${fmtTime(finishWin.end)}`;
-  $("cycleText").textContent = `${minsToHm(MAX_CYCLE_MIN)} (≤ ${MAX_CYCLE_MIN} min)`;
-
-  const startNowModeStartDevices = isBetween(now, startWin.start, startWin.end);
-  const washerStartNowMode = cheap.in && now < finishWin.start;
-
-  // Dishwasher
-  const dwOpts = buildOptions(now, DISHWASHER_H.map(h=>h*60), startWin);
-  const dwBest = bestN(dwOpts, 3, false).sort((a,b)=>a.mins-b.mins).map(o=>({ light:o.light, delay:delayText(o.mins), time:o.time }));
-  render("dwMain", dwBest, startNowModeStartDevices, fmtTime(now));
-
-  // Tumble Dryer
-  const tdOpts = buildOptions(now, DRYER_H.map(h=>Math.round(h*60)), startWin);
-  const tdBest = bestN(tdOpts, 3, false).sort((a,b)=>a.mins-b.mins).map(o=>({ light:o.light, delay:delayText(o.mins), time:o.time }));
-  render("tdMain", tdBest, startNowModeStartDevices, fmtTime(now));
-
-  // Washing Machine
-  const wmOpts = buildOptions(now, WASHER_H.map(h=>Math.round(h*60)), finishWin);
-  const wmBest = bestN(wmOpts, 3, true).sort((a,b)=>b.mins-a.mins).map(o=>({ light:o.light, delay:delayText(o.mins), time:o.time }));
-  render("wmMain", wmBest, washerStartNowMode, fmtTime(now));
-}
-
-/** Test controls */
-function syncTestUI(){
-  const on = $("useTest").checked;
-  $("testControls").classList.toggle("hidden", !on);
-  if(!on) $("testHint").textContent="";
-}
-$("useTest").addEventListener("change",()=>{syncTestUI(); tick();});
-$("testTime").addEventListener("input", tick);
+function syncTestUI(){const on=$("useTest").checked;$("testControls").classList.toggle("hidden",!on);if(!on)$("testHint").textContent="";}
+$("useTest").addEventListener("change",()=>{syncTestUI();tick();});
+$("testTime").addEventListener("input",tick);
 
 syncTestUI();
 tick();
-setInterval(tick, 1000);
+setInterval(tick,1000);
 </script>
 </body>
 </html>
