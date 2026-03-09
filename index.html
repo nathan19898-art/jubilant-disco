@@ -4,139 +4,538 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Off-Peak Rate Delay Dashboard</title>
+
 <style>
-:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-body { margin:0; padding:20px; background:#0b0d12; color:#e9eefc; }
-.wrap { max-width:980px; margin:0 auto; display:grid; gap:14px; }
-.card { background:#121826; border:1px solid #222b40; border-radius:14px; padding:14px; }
-.topbar { display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; align-items:flex-start; }
-h1 { margin:0; font-size:20px; }
-.muted { color:#a9b3cc; font-size:13px; line-height:1.35; }
-.mono { font-variant-numeric:tabular-nums; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.pill { padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid #2a3552; background:#0f1422; height:fit-content; }
-
-.grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
-@media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
-
-.machineHeader { display:flex; justify-content:space-between; align-items:baseline; }
-.title { font-size:18px; font-weight:800; }
-.mode { font-size:12px; padding:4px 10px; border-radius:999px; border:1px solid #2a3552; background:#0f1422; }
-
-.line { display:flex; justify-content:space-between; padding:10px; margin-top:8px;
-        border-radius:12px; background:#0f1422; border:1px solid #222b40; align-items:center; }
-
-.traffic { width:14px; height:14px; border-radius:50%; display:inline-block;
-           margin-right:8px; border:1px solid #2a3552; vertical-align:-2px; }
-
-.green { background:#1f5a39; border-color:#1f5a39; }
-.amber { background:#8a6b12; border-color:#8a6b12; }
-.red   { background:#7a1f2a; border-color:#7a1f2a; }
-
-.controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
-label { font-size:13px; color:#a9b3cc; display:flex; gap:8px; align-items:center; }
-input[type="time"]{
-  background:#0f1422; color:#e9eefc; border:1px solid #222b40;
-  border-radius:10px; padding:6px 10px;
+:root{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  color-scheme:dark;
 }
-input[type="checkbox"]{ width:16px; height:16px; }
-small { color:#a9b3cc; }
-hr { border:none; border-top:1px solid #222b40; margin:10px 0 0; }
 
-.hidden { display:none !important; }
+body{
+  margin:0;
+  padding:20px;
+  background:#0b0d12;
+  color:#e9eefc;
+}
+
+.wrap{
+  max-width:1100px;
+  margin:0 auto;
+  display:grid;
+  gap:14px;
+}
+
+.card{
+  background:#121826;
+  border:1px solid #222b40;
+  border-radius:14px;
+  padding:14px;
+}
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:flex-start;
+}
+
+h1{
+  margin:0;
+  font-size:20px;
+}
+
+.muted{
+  color:#a9b3cc;
+  font-size:13px;
+  line-height:1.4;
+}
+
+.note{
+  color:#a9b3cc;
+  font-size:12px;
+}
+
+.mono{
+  font-variant-numeric:tabular-nums;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+.pill{
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  border:1px solid #2a3552;
+  background:#0f1422;
+  height:fit-content;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:14px;
+}
+
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr;}
+}
+
+.machineHeader{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:12px;
+}
+
+.title{
+  font-size:18px;
+  font-weight:800;
+}
+
+.mode{
+  font-size:12px;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid #2a3552;
+  background:#0f1422;
+}
+
+.subhead{
+  margin-top:6px;
+  color:#a9b3cc;
+  font-size:13px;
+}
+
+.line{
+  display:flex;
+  justify-content:space-between;
+  padding:10px;
+  margin-top:8px;
+  border-radius:12px;
+  background:#0f1422;
+  border:1px solid #222b40;
+  align-items:center;
+}
+
+.lineLeft{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.lineText{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.lineSecondary{
+  font-size:12px;
+  color:#a9b3cc;
+}
+
+.traffic{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  border:1px solid #2a3552;
+}
+
+.green{background:#1f5a39;border-color:#1f5a39;}
+.amber{background:#9a7a12;border-color:#9a7a12;}
+.red{background:#7a1f2a;border-color:#7a1f2a;}
+
+.controls{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+
+label{
+  font-size:13px;
+  color:#a9b3cc;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+input[type="time"]{
+  background:#0f1422;
+  color:#e9eefc;
+  border:1px solid #222b40;
+  border-radius:10px;
+  padding:6px 10px;
+}
+
+input[type="checkbox"]{
+  width:16px;
+  height:16px;
+}
+
+.hidden{display:none!important;}
+
+.emptyState{
+  margin-top:10px;
+  padding:12px;
+  border-radius:12px;
+  background:#0f1422;
+  border:1px dashed #34405d;
+}
 </style>
 </head>
+
 <body>
 <div class="wrap">
 
-  <div class="card">
-    <div class="topbar">
-      <div>
-        <h1>Off-Peak Rate Delay Dashboard</h1>
-        <div class="muted">
-          Off-peak window: <span class="mono">23:30 → 05:30</span><br/>
-          Delay start window: <span class="mono" id="startWinText"></span><br/>
-          Delay finish window: <span class="mono" id="finishWinText"></span><br/>
-          Assumed max cycle: <span class="mono" id="cycleText"></span>
-        </div>
-        <hr/>
-        <div class="mono" style="font-size:18px;font-weight:800;margin-top:10px;" id="nowText"></div>
-      </div>
-      <div class="pill" id="inWindowPill">...</div>
-    </div>
+<div class="card">
+<div class="topbar">
 
-    <div class="controls">
-      <label><input id="useTest" type="checkbox"> Use test time</label>
+<div>
+<h1>Off-Peak Rate Delay Dashboard</h1>
 
-      <div id="testControls" class="hidden" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-        <label>Test HH:MM <input id="testTime" type="time" step="60" value="00:30"></label>
-        <small class="mono" id="testHint"></small>
-      </div>
-    </div>
-  </div>
+<div class="muted">
+Off-peak window: <span class="mono">23:30 → 05:30</span><br/>
+Delay start window: <span class="mono" id="startWinText"></span><br/>
+Delay finish window: <span class="mono" id="finishWinText"></span><br/>
+Assumed max cycle: <span class="mono" id="cycleText"></span><br/>
+Browser timezone: <span class="mono" id="tzText"></span>
+</div>
 
-  <div class="grid">
-    <div class="card">
-      <div class="machineHeader">
-        <div class="title">Dishwasher</div>
-        <div class="mode">Delay start</div>
-      </div>
-      <div id="dwMain"></div>
-    </div>
+<hr/>
 
-    <div class="card">
-      <div class="machineHeader">
-        <div class="title">Tumble Dryer</div>
-        <div class="mode">Delay start</div>
-      </div>
-      <div id="tdMain"></div>
-    </div>
+<div class="mono" style="font-size:18px;font-weight:800;margin-top:10px;" id="nowText"></div>
 
-    <div class="card">
-      <div class="machineHeader">
-        <div class="title">Washing Machine</div>
-        <div class="mode">Delay finish</div>
-      </div>
-      <div id="wmMain"></div>
-    </div>
-  </div>
+</div>
+
+<div class="pill" id="inWindowPill"></div>
+
+</div>
+
+<div class="controls">
+<label><input id="useTest" type="checkbox">Use test time</label>
+
+<div id="testControls" class="hidden">
+<label>Test HH:MM <input id="testTime" type="time" step="60" value="00:30"></label>
+<div class="note mono" id="testHint"></div>
+</div>
+</div>
+
+</div>
+
+<div id="machineGrid" class="grid"></div>
 
 </div>
 
 <script>
-const CHEAP_START={h:23,m:30},CHEAP_END={h:5,m:30};
-const MAX_CYCLE_MIN=210,YELLOW_PAD_MIN=30;
-const DISHWASHER_H=[3,6,9],WASHER_H=Array.from({length:22},(_,i)=>i+3),DRYER_H=[...Array.from({length:20},(_,i)=>(i+1)*0.5),11,12,13,14,16,18,20,22,24];
-const $=(id)=>document.getElementById(id),pad=(n)=>String(n).padStart(2,"0");
-const fmtNow=(d)=>`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,fmtTime=(d)=>`${pad(d.getHours())}:${pad(d.getMinutes())}`;
-const addMin=(d,m)=>new Date(d.getTime()+m*60000);
-function minsToHm(mins){const h=Math.floor(mins/60),m=mins%60;return `${h}h ${pad(m)}m`;}
-function getNow(){if(!$("useTest").checked)return new Date();const [hh,mm]=($("testTime").value||"00:30").split(":").map(x=>parseInt(x,10));const d=new Date();d.setHours(hh,mm,0,0);return d;}
-function getCheapWindow(now){const startToday=new Date(now);startToday.setHours(CHEAP_START.h,CHEAP_START.m,0,0);const endFromStartToday=new Date(startToday);endFromStartToday.setDate(endFromStartToday.getDate()+1);endFromStartToday.setHours(CHEAP_END.h,CHEAP_END.m,0,0);const startYesterday=new Date(startToday);startYesterday.setDate(startYesterday.getDate()-1);const endMorningToday=new Date(startToday);endMorningToday.setHours(CHEAP_END.h,CHEAP_END.m,0,0);if(now>=startYesterday&&now<endMorningToday)return{start:startYesterday,end:endMorningToday,in:true};if(now>=startToday&&now<endFromStartToday)return{start:startToday,end:endFromStartToday,in:true};if(now<startToday)return{start:startToday,end:endFromStartToday,in:false};const startTomorrow=new Date(startToday);startTomorrow.setDate(startTomorrow.getDate()+1);const endFromStartTomorrow=new Date(startTomorrow);endFromStartTomorrow.setDate(endFromStartTomorrow.getDate()+1);endFromStartTomorrow.setHours(CHEAP_END.h,CHEAP_END.m,0,0);return{start:startTomorrow,end:endFromStartTomorrow,in:false};}
-function getStartWindow(cheap){return{start:cheap.start,end:addMin(cheap.end,-MAX_CYCLE_MIN)};}
-function getFinishWindow(cheap){return{start:addMin(cheap.start,MAX_CYCLE_MIN),end:cheap.end};}
-function isBetween(t,a,b){return t>=a&&t<=b;}
-function classifyAgainstWindow(t,win){if(isBetween(t,win.start,win.end))return"green";const yellowStart=addMin(win.start,-YELLOW_PAD_MIN),yellowEnd=addMin(win.end,+YELLOW_PAD_MIN);return isBetween(t,yellowStart,yellowEnd)?"amber":"red";}
-function distanceToWindowMin(t,win){if(t<win.start)return Math.round((win.start-t)/60000);if(t>win.end)return Math.round((t-win.end)/60000);return 0;}
-function lightRank(light){return light==="green"?0:light==="amber"?1:2;}
-function bestN(options,N,preferLongest=false){options.sort((a,b)=>{const lr=lightRank(a.light)-lightRank(b.light);if(lr)return lr;const d=a.dist-b.dist;if(d)return d;return preferLongest?(b.mins-a.mins):(a.mins-b.mins);});return options.slice(0,N);}
-function delayText(mins){const h=Math.floor(mins/60),m=mins%60;return`${h}h ${pad(m)}m`;}
-function buildOptions(now,delaysMin,windowObj){return delaysMin.map(mins=>{const t=addMin(now,mins);const light=classifyAgainstWindow(t,windowObj);const dist=distanceToWindowMin(t,windowObj);return{mins,light,dist,time:t};});}
-function render(elId,rows,nowMode,nowLabel){let html="";if(nowMode){html=`<div class="line"><span><span class="traffic green"></span><span class="muted">START NOW</span></span><b class="mono">${nowLabel}</b></div>`;$(elId).innerHTML=html;return;}html+=rows.map(r=>`<div class="line"><span><span class="traffic ${r.light}"></span>${r.delay}</span><b class="mono">${fmtTime(r.time)}</b></div>`).join("");$(elId).innerHTML=html;}
-function tick(){const realNow=new Date(),now=getNow(),cheap=getCheapWindow(now);$("nowText").textContent=$("useTest").checked?`Now (test): ${fmtTime(now)}`:`Now: ${fmtNow(now)}`;$("testHint").textContent=$("useTest").checked?`Testing scenarios (real clock ${fmtNow(realNow)})`:"";$("inWindowPill").textContent=cheap.in?"In low-rate":"Not in low-rate";$("inWindowPill").style.borderColor=cheap.in?"#1f5a39":"#2a3552";const startWin=getStartWindow(cheap),finishWin=getFinishWindow(cheap);$("startWinText").textContent=`${fmtTime(startWin.start)} → ${fmtTime(startWin.end)}`;$("finishWinText").textContent=`${fmtTime(finishWin.start)} → ${fmtTime(finishWin.end)}`;$("cycleText").textContent=`${minsToHm(MAX_CYCLE_MIN)} (≤ ${MAX_CYCLE_MIN} min)`;const startNowModeStartDevices=isBetween(now,startWin.start,startWin.end),washerStartNowMode=cheap.in&&now<finishWin.start;
-// Dishwasher
-const dwOpts=buildOptions(now,DISHWASHER_H.map(h=>h*60),startWin);const dwBest=bestN(dwOpts,3,false).sort((a,b)=>a.mins-b.mins).map(o=>({light:o.light,delay:delayText(o.mins),time:o.time}));render("dwMain",startNowModeStartDevices?[]:dwBest,startNowModeStartDevices,fmtTime(now));
-// Tumble Dryer
-const tdOpts=buildOptions(now,DRYER_H.map(h=>Math.round(h*60)),startWin);const tdBest=bestN(tdOpts,3,false).sort((a,b)=>a.mins-b.mins).map(o=>({light:o.light,delay:delayText(o.mins),time:o.time}));render("tdMain",startNowModeStartDevices?[]:tdBest,startNowModeStartDevices,fmtTime(now));
-// Washing Machine
-const wmOpts=buildOptions(now,WASHER_H.map(h=>Math.round(h*60)),finishWin);const wmBest=bestN(wmOpts,3,true).sort((a,b)=>b.mins-a.mins).map(o=>({light:o.light,delay:delayText(o.mins),time:o.time}));render("wmMain",washerStartNowMode?[]:wmBest,washerStartNowMode,fmtTime(now));}
+const CHEAP_START={h:23,m:30}
+const CHEAP_END={h:5,m:30}
+const MAX_CYCLE_MIN=210
+const YELLOW_PAD_MIN=30
 
-function syncTestUI(){const on=$("useTest").checked;$("testControls").classList.toggle("hidden",!on);if(!on)$("testHint").textContent="";}
-$("useTest").addEventListener("change",()=>{syncTestUI();tick();});
-$("testTime").addEventListener("input",tick);
+const APPLIANCES=[
+{ id:"dw",name:"Dishwasher",mode:"delay-start",modeLabel:"Delay start",
+description:"Optimal delay so the cycle begins during off-peak.",
+delaysHours:[3,6,9],bestCount:3,preferLongest:false},
 
-syncTestUI();
-tick();
-setInterval(tick,1000);
+{ id:"td",name:"Tumble Dryer",mode:"delay-start",modeLabel:"Delay start",
+description:"Optimal delay so the cycle begins during off-peak.",
+delaysHours:[...Array.from({length:20},(_,i)=>(i+1)*0.5),11,12,13,14,16,18,20,22,24],
+bestCount:3,preferLongest:false},
+
+{ id:"wm",name:"Washing Machine",mode:"delay-finish",modeLabel:"Delay finish",
+description:"Optimal delay so the cycle ends during off-peak.",
+delaysHours:Array.from({length:22},(_,i)=>i+3),
+bestCount:3,preferLongest:true}
+]
+
+const $=id=>document.getElementById(id)
+const pad=n=>String(n).padStart(2,"0")
+
+function fmtNow(d){return`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`}
+function fmtTime(d){return`${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function addMin(d,m){return new Date(d.getTime()+m*60000)}
+
+function minsToHm(mins){
+const h=Math.floor(mins/60)
+const m=mins%60
+return`${h}h ${pad(m)}m`
+}
+
+function delayText(mins){
+const h=Math.floor(mins/60)
+const m=mins%60
+return`${h}h ${pad(m)}m`
+}
+
+function getNow(){
+if(!$("useTest").checked)return new Date()
+const [hh,mm]=($("testTime").value||"00:30").split(":").map(Number)
+const d=new Date()
+d.setHours(hh,mm,0,0)
+return d
+}
+
+function isBetween(t,a,b){return t>=a&&t<=b}
+
+function classifyAgainstWindow(t,win){
+
+if(isBetween(t,win.start,win.end)){
+return{light:"green",direction:"inside",deltaMin:0}
+}
+
+const diffBefore=Math.round((win.start-t)/60000)
+const diffAfter=Math.round((t-win.end)/60000)
+
+if(t<win.start && diffBefore<=YELLOW_PAD_MIN){
+return{light:"amber",direction:"early",deltaMin:diffBefore}
+}
+
+if(t>win.end && diffAfter<=YELLOW_PAD_MIN){
+return{light:"amber",direction:"late",deltaMin:diffAfter}
+}
+
+return{
+light:"red",
+direction:t<win.start?"early":"late",
+deltaMin:t<win.start?Math.round((win.start-t)/60000):Math.round((t-win.end)/60000)
+}
+
+}
+
+function buildReason(mode,cls){
+const word=mode==="delay-start"?"starts":"finishes"
+const unit=cls.deltaMin===1?"minute":"minutes"
+
+if(cls.light==="green") return`${word} during off-peak window`
+if(cls.direction==="early") return`${word} ${cls.deltaMin} ${unit} before off-peak window`
+return`${word} ${cls.deltaMin} ${unit} after off-peak window`
+}
+
+function lightRank(light){
+if(light==="green")return 0
+if(light==="amber")return 1
+return 2
+}
+
+function bestN(options,N,preferLongest=false){
+return[...options].sort((a,b)=>{
+const lr=lightRank(a.light)-lightRank(b.light)
+if(lr)return lr
+const d=a.dist-b.dist
+if(d)return d
+return preferLongest?(b.mins-a.mins):(a.mins-b.mins)
+}).slice(0,N)
+}
+
+function buildOptions(now,delaysMin,windowObj,mode){
+return delaysMin.map(mins=>{
+const t=addMin(now,mins)
+const cls=classifyAgainstWindow(t,windowObj)
+
+return{
+mins,
+time:t,
+light:cls.light,
+dist:cls.deltaMin,
+reason:buildReason(mode,cls)
+}
+})
+}
+
+function renderRows(elId,rows,nowMode,nowLabel,emptyMessage){
+
+const el=$(elId)
+
+if(nowMode){
+el.innerHTML=`
+<div class="line">
+<div class="lineLeft">
+<span class="traffic green"></span>
+<div class="lineText">
+<div class="linePrimary"><span class="muted">START NOW</span></div>
+</div>
+</div>
+<b class="mono">${nowLabel}</b>
+</div>`
+return
+}
+
+if(!rows.length){
+el.innerHTML=`
+<div class="emptyState">
+<div><strong>No ideal delay right now.</strong></div>
+<div class="note">${emptyMessage}</div>
+</div>`
+return
+}
+
+el.innerHTML=rows.map(r=>`
+<div class="line">
+<div class="lineLeft">
+<span class="traffic ${r.light}"></span>
+<div class="lineText">
+<div>${r.delay}</div>
+<div class="lineSecondary">${r.reason}</div>
+</div>
+</div>
+<b class="mono">${fmtTime(r.time)}</b>
+</div>`).join("")
+
+}
+
+function computeAndRender(){
+
+const now=getNow()
+
+const cheap=getCheapWindow(now)
+const startWin={start:cheap.start,end:addMin(cheap.end,-MAX_CYCLE_MIN)}
+const finishWin={start:addMin(cheap.start,MAX_CYCLE_MIN),end:cheap.end}
+
+$("startWinText").textContent=`${fmtTime(startWin.start)} → ${fmtTime(startWin.end)}`
+$("finishWinText").textContent=`${fmtTime(finishWin.start)} → ${fmtTime(finishWin.end)}`
+$("cycleText").textContent=`${minsToHm(MAX_CYCLE_MIN)} (≤ ${MAX_CYCLE_MIN} min)`
+
+$("inWindowPill").textContent=cheap.in?"In low-rate":"Not in low-rate"
+$("inWindowPill").style.borderColor=cheap.in?"#1f5a39":"#2a3552"
+
+const startNowMode=isBetween(now,startWin.start,startWin.end)
+const washerStartNowMode=cheap.in && now<finishWin.start
+
+for(const machine of APPLIANCES){
+
+const targetWindow=machine.mode==="delay-start"?startWin:finishWin
+const nowMode=machine.mode==="delay-start"?startNowMode:washerStartNowMode
+
+const delaysMin=machine.delaysHours.map(h=>Math.round(h*60))
+
+const options=buildOptions(now,delaysMin,targetWindow,machine.mode)
+const best=bestN(options,machine.bestCount,machine.preferLongest)
+
+const hasUseful=best.some(o=>o.light!=="red")
+
+const rows=hasUseful?best.map(o=>({
+light:o.light,
+delay:delayText(o.mins),
+time:o.time,
+reason:o.reason
+})):[ ]
+
+renderRows(
+`${machine.id}Main`,
+rows,
+nowMode,
+fmtTime(now),
+machine.mode==="delay-start"
+?"All delays would start outside the off-peak window."
+:"All delays would finish outside the off-peak window."
+)
+
+}
+
+}
+
+function getCheapWindow(now){
+
+const startToday=new Date(now)
+startToday.setHours(CHEAP_START.h,CHEAP_START.m,0,0)
+
+const endToday=new Date(startToday)
+endToday.setDate(endToday.getDate()+1)
+endToday.setHours(CHEAP_END.h,CHEAP_END.m,0,0)
+
+const startYesterday=new Date(startToday)
+startYesterday.setDate(startYesterday.getDate()-1)
+
+const endMorning=new Date(startToday)
+endMorning.setHours(CHEAP_END.h,CHEAP_END.m,0,0)
+
+if(now>=startYesterday && now<endMorning)
+return{start:startYesterday,end:endMorning,in:true}
+
+if(now>=startToday && now<endToday)
+return{start:startToday,end:endToday,in:true}
+
+if(now<startToday)
+return{start:startToday,end:endToday,in:false}
+
+const startTomorrow=new Date(startToday)
+startTomorrow.setDate(startTomorrow.getDate()+1)
+
+const endTomorrow=new Date(startTomorrow)
+endTomorrow.setDate(endTomorrow.getDate()+1)
+endTomorrow.setHours(CHEAP_END.h,CHEAP_END.m,0,0)
+
+return{start:startTomorrow,end:endTomorrow,in:false}
+
+}
+
+function updateClockOnly(){
+
+const realNow=new Date()
+const now=getNow()
+
+$("nowText").textContent=$("useTest").checked
+?`Now (test): ${fmtTime(now)}`
+:`Now: ${fmtNow(now)}`
+
+$("testHint").textContent=$("useTest").checked
+?`Testing scenarios (real clock ${fmtNow(realNow)})`
+:""
+
+}
+
+function syncTestUI(){
+const on=$("useTest").checked
+$("testControls").classList.toggle("hidden",!on)
+if(!on)$("testHint").textContent=""
+}
+
+function initTimezoneLabel(){
+$("tzText").textContent=Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
+function scheduleMinuteRefresh(){
+const ms=(60-new Date().getSeconds())*1000-new Date().getMilliseconds()
+setTimeout(()=>{
+computeAndRender()
+setInterval(computeAndRender,60000)
+},ms)
+}
+
+$("useTest").addEventListener("change",()=>{
+syncTestUI()
+updateClockOnly()
+computeAndRender()
+})
+
+$("testTime").addEventListener("input",()=>{
+updateClockOnly()
+computeAndRender()
+})
+
+buildMachineCards()
+initTimezoneLabel()
+syncTestUI()
+updateClockOnly()
+computeAndRender()
+
+setInterval(updateClockOnly,1000)
+scheduleMinuteRefresh()
+
+function buildMachineCards(){
+const grid=$("machineGrid")
+grid.innerHTML=APPLIANCES.map(m=>`
+<div class="card">
+<div class="machineHeader">
+<div class="title">${m.name}</div>
+<div class="mode">${m.modeLabel}</div>
+</div>
+<div class="subhead">${m.description}</div>
+<div id="${m.id}Main"></div>
+</div>
+`).join("")
+}
 </script>
 </body>
 </html>
